@@ -1,0 +1,1 @@
+mingw32-gcc.exe -o test.exe c:/programming/dlib-19.2/examples/3d_point_cloud_ex.cpp -v -Ic:/programming/dlib-19.2/ -std=c++11

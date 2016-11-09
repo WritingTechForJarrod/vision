@@ -18,6 +18,6 @@ Building examples in Visual Studio 2015:
 * if you need to open and save jpeg images you'll need to add `#define DLIB_JPEG_SUPPORT' and link to libjpeg
  * right click on your project, select Properties->Configuration Properties->C/C++->Preprocessor and add DLIB_JPEG_SUPPORT to Preprocessor Definitions
  * to install libjpeg open Tools->NuGet Package Manager->Manage NuGet Packages for Solution... and search 'libjpeg' in the Browse tab
- * install the package you find
+ * install the package you find 
 #If you are building a dll that uses Dlib:
 * add dlib/all/source.cpp to sources but disable precompiled headers for this file by clicking on source.cpp, selecting Properties->Precompiled Headers and change the field Precompiled Header to Not Using Precompiled Header

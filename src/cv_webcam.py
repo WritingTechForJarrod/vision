@@ -16,7 +16,7 @@ screen_h = 480
 print("Opening window...")
 cv2.namedWindow('webcam', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('webcam', screen_w, screen_h)
-print("Taking images...")
+print("Taking images, pres Esc to exit...")
 
 white_frame_gs = np.empty((480, 640), np.uint8)
 white_frame_gs.fill(255)
@@ -75,8 +75,8 @@ cv2.equalizeHist(grayscale_frame, grayscale_frame)
 
 '''
 def screenshot():
-    cv2.imwrite('screenshot_rgb.png', current_frame)
-    cv2.imwrite('screenshot_bw.png', grayscale_frame)
+    cv2.imwrite('../img/screenshot_rgb.png', current_frame)
+    cv2.imwrite('../img/screenshot_bw.png', grayscale_frame)
 
 def toggle_mode(mode_to_toggle):
     if mode_to_toggle in mode:
@@ -94,15 +94,18 @@ process_key['e'] = lambda: toggle_mode('equalize')
 process_key['d'] = lambda: toggle_mode('dft')
 process_key['g'] = lambda: toggle_mode('edge')
 process_key['h'] = lambda: toggle_mode('haar')
-process_key['s'] = lambda: toggle_mode('sift')
+process_key['s'] = lambda: toggle_mode('sum')
 process_key['c'] = lambda: toggle_mode('corner')
 process_key['f'] = lambda: toggle_mode('file')
 
 mode = []
+for key in process_key.keys():
+    print(key)
 #process_key['d']()
 
 def on_mouse(event, x, y, flags, params):
     print(x, y)
+    
 cv2.setMouseCallback('mouse input', on_mouse)
 
 def get_derivative(frames, degree=1):
@@ -150,7 +153,7 @@ while(True):
         grayscale_frame /= (max_val/256)
         grayscale_frame = np.array(grayscale_frame, np.uint8)
 
-    ld.detect(grayscale_frame)
+    #ld.detect(grayscale_frame)
 
     if 'grayscale' in mode: 
         current_frame = grayscale_frame
@@ -159,6 +162,34 @@ while(True):
     if 'lines' in mode:
         ld.draw(current_frame)
     if 'sum' in mode:
+        COLOR_MIN = np.array([0, 0, 10],np.uint8)
+        COLOR_MAX = np.array([127, 127, 255],np.uint8)
+        
+        hsv_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
+        hsv_frame[:,:,1] = cv2.inRange(hsv_frame[:,:,1], 120, 255)
+        hsv_frame[:,:,2] = cv2.inRange(hsv_frame[:,:,2], 50, 200)
+        current_frame = cv2.cvtColor(hsv_frame, cv2.COLOR_HSV2BGR)
+        dot = cv2.inRange(current_frame, COLOR_MIN, COLOR_MAX)
+        #current_frame[:,:,] = dot
+        red = np.array(dot, np.uint8)
+        ret,contours,hierarchy = cv2.findContours(red, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        print(len(contours))
+        cv2.drawContours(current_frame,contours,-1,np.array([255,0,0]), 2)
+        #current_frame[:,:,0] += 127s
+
+        '''
+        i_b = 0
+        i_g = 1
+        i_r = 2 
+        '''
+        '''
+        shape = grayscale_frame.shape
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+        '''
+        #r = 2*r/gray_frame[:,:,0]
+        #r = np.add(r,gray_frame[:,:,0])
+        '''
         num_row, num_col = (grayscale_frame.shape[0], grayscale_frame.shape[1])
         row_average = np.ndarray((num_row, 1), dtype=float)
         col_average = np.ndarray((1, num_col), dtype=float)
@@ -174,6 +205,8 @@ while(True):
             col_average[0][col] = average
         grayscale_frame = row_ones * col_average / 512 + row_average * col_ones / 512
         current_frame = grayscale_frame
+        '''
+        #current_frame = grayscale_frame
     if 'file' in mode:
         current_frame = cv2.imread("test.png")
         grayscale_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
@@ -186,7 +219,6 @@ while(True):
         max_val = np.max(grayscale_frame)
         #grayscale_frame = grayscale_frame / max_val
         #ret, grayscale_frame = cv2.threshold(grayscale_frame, 0.01, 255, cv2.THRESH_BINARY)
-        current_frame = grayscale_frame
     if 'sift' in mode:
         sift = cv2.xfeatures2d.SIFT_create()
         kp = sift.detect(gray,None)

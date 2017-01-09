@@ -6,7 +6,7 @@ Current dependencies:
  * numpy
 * C++11
  * DLib
-  * other packages may be required by DLib
+  * other packages may be required by DLib  
 Complete list of python modules in use at runtime in modules.txt
 
 #For building in Dlib in Windows:

@@ -39,7 +39,7 @@ if __name__ == '__main__':
 		upper = np.array([255,255,255],np.uint8)
 		thinger = cv2.inRange(result,lower,upper)
 
-		result[:,:,2] = cv2.inRange(result[:,:,1],220,255)
+		result[:,:,2] = cv2.inRange(result[:,:,1],200,255)
 		'''
 		stride = 5
 		for y in range(shape[0]-stride):
@@ -52,6 +52,8 @@ if __name__ == '__main__':
 		'''
 		stride = 5
 		result = cv2.cvtColor(result,cv2.COLOR_HSV2BGR)
+		result = result[:,:,2]//2 - result[:,:,1]//2 + 127
+		'''
 		g_acc = 0
 		r_acc = 0
 		for x in range(shape[1]):
@@ -74,14 +76,16 @@ if __name__ == '__main__':
 					if r_acc > 0:
 						final[shape[0]-1-y,x][2] = 10*r_acc
 						r_acc = 0
-					'''
-					for yi in range(g_acc):
-						if y+yi < shape[0]:
-							if result[y+yi,x][2] > 127 and result[y+yi,x][1] < 127:
-								final[y+yi,x] = (0,255,0)
-							else:
-								final[y+yi,x] = (0,0,0)
-					'''
+		'''
+		kernel = np.zeros((5,1),np.float32)
+		mainlog.debug("Kernel:\n"+str(kernel))
+		kernel[0,0] = -0.5
+		kernel[1,0] = -0.2
+		kernel[2,0] = 0.0	
+		kernel[3,0] = 0.2
+		kernel[4,0] = 0.5
+		final = cv2.filter2D(result,-1,kernel)
+		final = cv2.inRange(final,127,255)
 					
 	if mode is 'hue':
 		result[:,:,1] = result[:,:,0]
@@ -94,7 +98,7 @@ if __name__ == '__main__':
 		result[:,:,1] = result[:,:,2]
 	#result = img
 	#final = cv2.Sobel(img,0,0,0)
-	cv2.imshow(window_name,result)
+	cv2.imshow(window_name,final)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
 	

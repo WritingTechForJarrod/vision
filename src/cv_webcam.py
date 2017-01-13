@@ -162,14 +162,14 @@ while(True):
     if 'lines' in mode:
         ld.draw(current_frame)
     if 'sum' in mode:
-        COLOR_MIN = np.array([0, 0, 10],np.uint8)
-        COLOR_MAX = np.array([127, 127, 255],np.uint8)
+        COLOR_MIN = np.array([0,0,127],np.uint8)
+        COLOR_MAX = np.array([127,127,255],np.uint8)
         
         hsv_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
-        hsv_frame[:,:,1] = cv2.inRange(hsv_frame[:,:,1], 120, 255)
-        hsv_frame[:,:,2] = cv2.inRange(hsv_frame[:,:,2], 50, 200)
+        hsv_frame[:,:,1] = cv2.inRange(hsv_frame[:,:,1],191,255)
+        hsv_frame[:,:,2] = cv2.inRange(hsv_frame[:,:,2],50,200)
         current_frame = cv2.cvtColor(hsv_frame, cv2.COLOR_HSV2BGR)
-        dot = cv2.inRange(current_frame, COLOR_MIN, COLOR_MAX)
+        dot = cv2.inRange(current_frame,COLOR_MIN,COLOR_MAX)
         #current_frame[:,:,] = dot
         red = np.array(dot, np.uint8)
         ret,contours,hierarchy = cv2.findContours(red, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)

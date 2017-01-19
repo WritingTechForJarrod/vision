@@ -1,7 +1,7 @@
 // test_lib.cpp : Defines the exported functions for the DLL application.
 //
 
-//#include "stdafx.h"
+#include "stdafx.h"
 #include "face_detection_functions.h"
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_processing/render_face_detections.h>

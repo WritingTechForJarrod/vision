@@ -91,7 +91,8 @@ if __name__ == '__main__':
 	final = np.empty(shape,np.uint8)
 	final.fill(0)
 
-	with open('../../gen/'+time.strftime('%Y%m%d%H%M%S')+'.vcr','w') as f:
+	datetime_start = time.strftime('%Y%m%d%H%M%S')
+	with open('../../gen/'+datetime_start+'.vcr','w') as f:
 		while user_in != ord('x'):
 			global last_result
 			img = cv2.flip(get_image(),1)
@@ -128,6 +129,8 @@ if __name__ == '__main__':
 
 				t = time.clock() - t0
 				f.write('t '+str(t)+'\n')
+				cv2.imwrite('../../img/captured/'+datetime_start+'_'+str(t)+'_.png',img)
+
 				for contour in new_contours:
 					area = contour.last_area()
 					pos = contour.last_position()
@@ -156,7 +159,7 @@ if __name__ == '__main__':
 
 				last_contours = new_contours
 
-			cv2.imshow(window_name,result)
+			cv2.imshow(window_name,img)
 			last_result = final
 			user_in = cv2.waitKey(1)
 

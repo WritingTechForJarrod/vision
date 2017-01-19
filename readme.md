@@ -6,7 +6,7 @@ Current dependencies:
  * numpy
 * C++11
  * DLib
-  * other packages may be required by DLib  
+ &nbsp;&nbsp;* other packages may be required by DLib  
 Complete list of python modules in use at runtime in modules.txt  
 If you have any questions email me at `max[at]embeddedprofessional.com`  
 Thanks to all the sources I used to figure this out, I looked at eleventy billion different sources to be able to finally build and run even the examples, I wish I could thank each one but that is lost to history  
@@ -48,31 +48,31 @@ The steps:
  * open the VS2015 project that was created in the last step, for me 'C:\Users\Maxim\Downloads\opencv\sources\OpenCV.sln'  
  * build Debug and then Release versions, this will take a long time (I think > 1 hour for me)
  * libs and dlls should now be in the following directories (~ is whatever the root of these is for you):  
-  * debug libs in '~\opencv\sources\lib\Debug'  
-  * release libs in '~\opencv\sources\lib\Release'  
-  * debug dlls in '~\opencv\sources\bin\Debug'  
-  * release dlls in '~\opencv\sources\bin\Release'  
+ &nbsp;&nbsp;* debug libs in '~\opencv\sources\lib\Debug'  
+ &nbsp;&nbsp;* release libs in '~\opencv\sources\lib\Release'  
+ &nbsp;&nbsp;* debug dlls in '~\opencv\sources\bin\Debug'  
+ &nbsp;&nbsp;* release dlls in '~\opencv\sources\bin\Release'  
 * you can close the VS2015 project and whatever command windows you have open and open your project
 * in your project add links to the lib and dll dependencies, for me this was needed for building 'webcam_face_pose_ex.cpp'  
  * right click on your project and choose the Release configuration for Platform x64  
  * choose Configuration Properties->C/C++->General from the left menu window
  * in Additional Include Directories add paths to your Release dlls, for me 'C:/Users/Maxim/Downloads/opencv/sources/bin/Release'  
  * choose Configuration Properties->VC++ Directories from the left menu window  
-  * in Library Directories add the path to your Release libs, for me 'C:\Users\Maxim\Downloads\opencv\sources\lib\Release'  
+ &nbsp;&nbsp;* in Library Directories add the path to your Release libs, for me 'C:\Users\Maxim\Downloads\opencv\sources\lib\Release'  
  * choose Configuration Properties->Linker->Input from the left menu window  
-  * in Addtional Dependencies add the .dlls you will need for the example you are building, for me 'opencv_highgui2413.lib;opencv_core2413.lib;opencv_video2413.lib;' were added, not sure if I needed the last one
+ &nbsp;&nbsp;* in Addtional Dependencies add the .dlls you will need for the example you are building, for me 'opencv_highgui2413.lib;opencv_core2413.lib;opencv_video2413.lib;' were added, not sure if I needed the last one
  * if you need to build in Debug mode follow the above but choose the Debug configuration from the properties pop-up and repeat the steps choosing the debug dlls and libs (debug libs and dlls have 'd' appended to the end of them)
 * build your project  
 * add the .dlls you will need to the directory in which your executable is created  
  * for my example my project is called 'facial_detection', so in the '~/facial_detection/x64/Release' directory I had to add:
-  * jpeg.dll
-  * opencv_core2413.dll
-  * opencv_highgui2413.dll
+ &nbsp;&nbsp;* jpeg.dll
+ &nbsp;&nbsp;* opencv_core2413.dll
+ &nbsp;&nbsp;* opencv_highgui2413.dll
 * I also had to add the 'shape_predictor_68_face_landmarks.dat' file to the directory the .exe was in, i got it at:
  * https://github.com/AKSHAYUBHAT/TensorFace/blob/master/openface/models/dlib/shape_predictor_68_face_landmarks.dat
 * open the directory the .exe is in and run it by double-clicking it, if I run it from VS2015 it closes prematurely  
   
-I hope this helps you! Any errors, omissions, questions email me at `max[at]embeddedprofessional.com'    
+I hope this helps you! Any errors, omissions, questions email me at `max[at]embeddedprofessional.com`    
 
 #If you are building a dll that uses Dlib:
 * add dlib/all/source.cpp to sources but disable precompiled headers for this file by clicking on source.cpp, selecting Properties->Precompiled Headers and change the field Precompiled Header to Not Using Precompiled Header

@@ -6,7 +6,8 @@ Current dependencies:
   * numpy
 * C++11
   * DLib
-    * other packages may be required by DLib
+    * other packages may be required by DLib  
+
 Complete list of python modules in use at runtime in modules.txt  
 If you have any questions email me at `max[at]embeddedprofessional.com`  
 Thanks to all the sources I used to figure this out, I looked at eleventy billion different sources to be able to finally build and run even the examples, I wish I could thank each one but that is lost to history  

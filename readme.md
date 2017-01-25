@@ -1,18 +1,26 @@
-###Vision Module
-#Detecting facial features and movement
+#Vision Module
+##Detecting facial features and movement
 Current dependencies:
 * python 2.7.6
   * opencv
   * numpy
 * C++11
   * DLib
+    * OpenCV 2.4.13 built for VS2015
     * other packages may be required by DLib  
 
 Complete list of python modules in use at runtime in modules.txt  
 If you have any questions email me at `max[at]embeddedprofessional.com`  
-Thanks to all the sources I used to figure this out, I looked at eleventy billion different sources to be able to finally build and run even the examples, I wish I could thank each one but that is lost to history  
+Thanks to all the sources I used to figure this out, I looked at eleventy billion different sources to be able to finally build and run even the examples, I wish I could thank each one but that is lost to history. Special thanks to the implementers and maintainers of DLib and OpenCV.
 
-#For building in Dlib in Windows:
+This project is developed in a Win64 environment and all libs, dlls, and binaries are built for this environment.  
+  
+#Organization  
+Python scripts and C++ files in /src  
+Visual Studio 2015 solution for face detection DLib example in /face_detection  
+Latest stable face_detection.exe and .dlls, training data in /bin
+
+##For building using Dlib in Windows:
 You'll need C++11 support, so VS2015 or later  
 If you want to use g++ or another compiler try some flavour of MinGW-64, be sure to install pthread libs  
 Building examples in Visual Studio 2015:
@@ -27,7 +35,7 @@ Building examples in Visual Studio 2015:
   * to install libjpeg open Tools->NuGet Package Manager->Manage NuGet Packages for Solution... and search 'libjpeg' in the Browse tab
   * install the package you find
  
-#For building Dlib with opencv dependencies in Windows:  
+##For building using Dlib with opencv dependencies in Windows:  
 Follow the above instructions, then prepare yourself for a journey of great discovery.  
 The opencv version assumed here is 2.4.13. This version is built with VS2012 but Dlib requires VS2015 for C++11 support. Therefore the opencv libs and dlls have to be built before we can use it with the Dlib examples. If you get an error like `mismatch detected for '_MSC_VER': value '1900' doesn't match value '1800'` when attempting to build examples the mismatch between compiler versions used for the opencv and Dlib builds will require you to build them yourself. This is a multi-step process, hopefully this description is accurate for your purposes. For this example I am building for 64-bit windows.  
 The steps:  
@@ -75,5 +83,5 @@ The steps:
   
 I hope this helps you! Any errors, omissions, questions email me at `max[at]embeddedprofessional.com`    
 
-#If you are building a dll that uses Dlib:
+##If you are building a dll that uses Dlib:
 * add dlib/all/source.cpp to sources but disable precompiled headers for this file by clicking on source.cpp, selecting Properties->Precompiled Headers and change the field Precompiled Header to Not Using Precompiled Header

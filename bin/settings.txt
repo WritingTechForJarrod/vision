@@ -1,4 +1,5 @@
-cv_window = True
+cv_window = False
 brow_threshold = 1.0
 mouth_threshold = 1.0
 max_delta_ms = 500
+num_loops = 500

@@ -1,4 +1,4 @@
 cv_window = False
-brow_threshold = 1.0
+brow_threshold = 1.1
 mouth_threshold = 1.0
-max_delta_ms = 500
+max_delta_ms = 300

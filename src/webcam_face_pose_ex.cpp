@@ -287,7 +287,7 @@ int main()
 				int triggered(0);
 				if (last_metrics.initialized) {
 					triggered = this_metrics.check_trigger(last_metrics);
-					trigger_out << triggered << "," 
+					trigger_out << "," << std::chrono::duration_cast<std::chrono::milliseconds>(this_metrics.time_constructed-last_metrics.time_constructed).count() << triggered << ","
 						<< this_metrics.eyebrow_metric << ","
 						<< this_metrics.mouth_metric << endl;
 					cout << triggered << endl;

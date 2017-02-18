@@ -133,7 +133,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\..\..\Programming\dlib-19.2\dlib\all\source.cpp" />
-    <ClCompile Include="..\..\..\..\..\..\..\Programming\dlib-19.2\examples\webcam_face_pose_ex.cpp" />
+    <ClCompile Include="..\src\webcam_face_pose_ex.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

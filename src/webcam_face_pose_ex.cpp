@@ -52,7 +52,7 @@ int main() {
 		zmq::socket_t push(context, ZMQ_PUSH);
 		sub.connect("tcp://localhost:5556");
 		push.connect("tcp://localhost:5557");
-		const char *filter = "face";
+		const char *filter = "@face";
 		sub.setsockopt(ZMQ_SUBSCRIBE, filter, strlen(filter));
 
         cv::VideoCapture cap(0);
@@ -114,11 +114,17 @@ int main() {
 
 				char buffer[] = "Default buffer message this is how long? I don't know!";
 				sprintf(buffer,
-					"eyebrows %d,%d,%d,%d",
+					"face %d,%d,%d,%d",
 					shapes[0].part(24).x(),
 					shapes[0].part(24).y(),
 					shapes[0].part(19).x(),
-					shapes[0].part(19).y()
+					shapes[0].part(19).y(),
+					shapes[0].part(33).x(),
+					shapes[0].part(33).y(),
+					shapes[0].part(62).x(),
+					shapes[0].part(62).y(),
+					shapes[0].part(57).x(),
+					shapes[0].part(57).y()
 				);
 				zmq::message_t sending(strlen(buffer));
 				memcpy(sending.data(), buffer, strlen(buffer));

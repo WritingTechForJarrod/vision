@@ -108,7 +108,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 	char send_message[25]; // Max message size is 14 bytes (Based on 1080x720 screen)
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
-		_snprintf(send_message, 50, "eyetracker %5.1f,%5.1f", eventParams.X, eventParams.Y);
+		_snprintf(send_message, 50, "eyetracker %5.1d,%5.1d", (int)eventParams.X, (int)eventParams.Y);
 		zmq_send(push_socket, send_message, strlen(send_message), 0);
 		//printf("%s\n", send_message);
 		//printf("Gaze Data: (%5.1f, %5.1f) timestamp %.0f ms\r", eventParams.X, eventParams.Y, eventParams.Timestamp);
@@ -177,7 +177,6 @@ int main(int argc, char* argv[])
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
 	TX_TICKET hEventHandlerTicket = TX_INVALID_TICKET;
 	BOOL success;
-	int arr[2];
 	// zmq variables
 	char buffer[100];
 	const char* subscription_filter = "@eyetracker";

@@ -8,6 +8,7 @@
 
 #define SOCKET_SUB  "tcp://localhost:5556" // Eye tracker module listens to this socket for commands
 #define SOCKET_PUSH "tcp://localhost:5557" // Eye tracker module pushes updates on this socket
+#define TOPIC_FILTER "eyetracker"
 
 #include <Windows.h>
 #include <stdio.h>
@@ -26,6 +27,57 @@ static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
 static void *context;
 static void *subscription_socket;
 static void *push_socket;
+static int start_message_sent = 0;
+static int marco_blocking = 0;
+
+/*
+* Array of valid messages eyetracker can send. Maintains one to one correspondence with "message_type" enumeration.
+*/
+char* eyetracker_messages[] = { "eyetracker started",
+								"eyetracker stopping",
+								"eyetracker polo",
+								"eyetracker err Tobii engine initialization failed",
+								"eyetracker err Failed to initialize the data stream.",
+								"eyetracker err The connection state is now SERVER_VERSION_TOO_LOW: this application requires a more recent version of the EyeX Engine to run.",
+								"eyetracker err The connection state is now SERVER_VERSION_TOO_HIGH: this application requires an older version of the EyeX Engine to run.s",
+								"eyetracker err Failed to interpret gaze data event packet.",
+								"EyeX could not be shut down cleanly."
+								};
+
+/*
+* Message types used to index "eyetracker_messages" array.
+*/
+typedef enum message_type
+{
+	ET_STARTING,
+	ET_STOPPING,
+	ET_MARCO,
+	ET_INIT_FAILED,
+	ET_DATA_STREAM_FAILED,
+	ET_SERVER_LOW,
+	ET_SERVER_HIGH,
+	ET_DATA_PACKET,
+	ET_STOP_FAIL
+} ET_Message;
+
+/*
+* Commands issued from console
+*/
+typedef enum command
+{
+	CONSOLE_MARCO,
+	CONSOLE_NO_CMD,
+	CONSOLE_STOP
+} Command;
+
+/*
+* Function to send ZMQ message from select Eyetracker messages
+*/
+void send_zmq_message(ET_Message send_message) {
+	char buffer[100];
+	_snprintf(buffer, 50, "%s",eyetracker_messages[send_message]);
+	zmq_send(push_socket, buffer, strlen(buffer), 0);
+}
 
 /*
  * Initializes g_hGlobalInteractorSnapshot with an interactor that has the Gaze Point behavior.
@@ -69,33 +121,29 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	switch (connectionState) {
 	case TX_CONNECTIONSTATE_CONNECTED: {
 			BOOL success;
-			printf("The connection state is now CONNECTED (We are connected to the EyeX Engine)\n");
 			// commit the snapshot with the global interactor as soon as the connection to the engine is established.
 			// (it cannot be done earlier because committing means "send to the engine".)
 			success = txCommitSnapshotAsync(g_hGlobalInteractorSnapshot, OnSnapshotCommitted, NULL) == TX_RESULT_OK;
 			if (!success) {
-				printf("Failed to initialize the data stream.\n");
-			}
-			else {
-				printf("Waiting for gaze data to start streaming...\n");
+				send_zmq_message(ET_DATA_STREAM_FAILED);
 			}
 		}
 		break;
 
 	case TX_CONNECTIONSTATE_DISCONNECTED:
-		printf("The connection state is now DISCONNECTED (We are disconnected from the EyeX Engine)\n");
+		//printf("The connection state is now DISCONNECTED (We are disconnected from the EyeX Engine)\n");
 		break;
 
 	case TX_CONNECTIONSTATE_TRYINGTOCONNECT:
-		printf("The connection state is now TRYINGTOCONNECT (We are trying to connect to the EyeX Engine)\n");
+		//printf("The connection state is now TRYINGTOCONNECT (We are trying to connect to the EyeX Engine)\n");
 		break;
 
 	case TX_CONNECTIONSTATE_SERVERVERSIONTOOLOW:
-		printf("The connection state is now SERVER_VERSION_TOO_LOW: this application requires a more recent version of the EyeX Engine to run.\n");
+		send_zmq_message(ET_SERVER_LOW);
 		break;
 
 	case TX_CONNECTIONSTATE_SERVERVERSIONTOOHIGH:
-		printf("The connection state is now SERVER_VERSION_TOO_HIGH: this application requires an older version of the EyeX Engine to run.\n");
+		send_zmq_message(ET_SERVER_HIGH);
 		break;
 	}
 }
@@ -105,15 +153,14 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
  */
 void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 {
-	char send_message[25]; // Max message size is 14 bytes (Based on 1080x720 screen)
+	char send_message[30]; // Max message size is 30 bytes
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
-		_snprintf(send_message, 50, "eyetracker %5.1d,%5.1d", (int)eventParams.X, (int)eventParams.Y);
-		zmq_send(push_socket, send_message, strlen(send_message), 0);
-		//printf("%s\n", send_message);
-		//printf("Gaze Data: (%5.1f, %5.1f) timestamp %.0f ms\r", eventParams.X, eventParams.Y, eventParams.Timestamp);
+		_snprintf(send_message, 50, "%s gaze %5.1d,%5.1d",TOPIC_FILTER, (int)eventParams.X, (int)eventParams.Y);
+		if (start_message_sent == 1 && marco_blocking == 0)
+			zmq_send(push_socket, send_message, strlen(send_message), 0);
 	} else {
-	  printf("Failed to interpret gaze data event packet.");
+		send_zmq_message(ET_DATA_PACKET);
 	}
 }
 
@@ -143,12 +190,55 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 }
 
 /*
-* Quit app by closing zmq sockets, destroying zmq context and disconnecting from Tobii server.
+* Eyetracker start-up function. Sets up 0mq communication, sends eyetracker starting message and connects to Tobii Engine.
 */
-void quit_app(TX_CONTEXTHANDLE* hContext) {
+BOOL _on_start(char* subscription_filter, TX_CONTEXTHANDLE* hContext, TX_TICKET* hConnectionStateChangedTicket,
+			   TX_TICKET* hEventHandlerTicket) {
+	BOOL success;
+	// Create and initialize 0mq sockets
+	context = zmq_ctx_new();
+	subscription_socket = zmq_socket(context, ZMQ_SUB);
+	push_socket = zmq_socket(context,ZMQ_PUSH);
+	zmq_connect(subscription_socket, SOCKET_SUB);
+	zmq_connect(push_socket, SOCKET_PUSH);
+	zmq_setsockopt(subscription_socket, ZMQ_SUBSCRIBE, subscription_filter, strlen(subscription_filter));
+
+	send_zmq_message(ET_STARTING);
+	start_message_sent = 1;
+
+	// initialize and enable the context that is our link to the EyeX Engine.
+	success = txInitializeEyeX(TX_EYEXCOMPONENTOVERRIDEFLAG_NONE, NULL, NULL, NULL, NULL) == TX_RESULT_OK;
+	success &= txCreateContext(hContext, TX_FALSE) == TX_RESULT_OK;
+	success &= InitializeGlobalInteractorSnapshot(*hContext);
+	success &= txRegisterConnectionStateChangedHandler(*hContext, hConnectionStateChangedTicket, OnEngineConnectionStateChanged, NULL) == TX_RESULT_OK;
+	success &= txRegisterEventHandler(*hContext, hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
+
+	// enables connection to EyeX Engine, connection alive
+	// until it is desabled or context is destroyed
+	success &= txEnableConnection(*hContext) == TX_RESULT_OK;
+
+	return success;
+}
+
+/*
+* After receiving "marco" command, responds with "eyetracker polo".
+*/
+void _on_marco() {
+	marco_blocking = 1;
+	send_zmq_message(ET_MARCO);
+	marco_blocking = 0;
+	return;
+}
+
+/*
+* After receiving stop command from server, close zmq sockets, destroy zmq context and disconnect from Tobii engine.
+*/
+void _on_stop(TX_CONTEXTHANDLE* hContext) {
 	boolean success;
+	send_zmq_message(ET_STOPPING);
 	// zmq clean up
 	zmq_close(subscription_socket);
+	zmq_close(push_socket);
 	zmq_ctx_destroy(context);
 
 	// Tobii cleanup
@@ -160,11 +250,24 @@ void quit_app(TX_CONTEXTHANDLE* hContext) {
 	success &= txUninitializeEyeX() == TX_RESULT_OK;
 
 	if (!success) {
-		printf("EyeX could not be shut down cleanly.\n");
-		while (1) {
-		}
+		send_zmq_message(ET_STOP_FAIL);
 	}
+}
 
+/*
+* Processes incoming message from console and returns the command that was received.
+*/
+Command read_message() {
+	Command received = CONSOLE_NO_CMD;
+	char buffer[100];
+	zmq_recv(subscription_socket,buffer,100,ZMQ_DONTWAIT);
+	if (strstr(buffer, "marco") != NULL) {
+		received = CONSOLE_MARCO;
+	}
+	else if(strstr(buffer, "stop") != NULL) {
+		received = CONSOLE_STOP;
+	}
+	return received;
 }
 
 /*
@@ -178,46 +281,27 @@ int main(int argc, char* argv[])
 	TX_TICKET hEventHandlerTicket = TX_INVALID_TICKET;
 	BOOL success;
 	// zmq variables
-	char buffer[100];
-	const char* subscription_filter = "@eyetracker";
+	char* subscription_filter = "@eyetracker";
 	int is_alive = 1;
-	char ch = 't';
+	Command received = CONSOLE_NO_CMD;
 
-	// initialize and enable the context that is our link to the EyeX Engine.
-	success = txInitializeEyeX(TX_EYEXCOMPONENTOVERRIDEFLAG_NONE, NULL, NULL, NULL, NULL) == TX_RESULT_OK;
-	success &= txCreateContext(&hContext, TX_FALSE) == TX_RESULT_OK;
-	success &= InitializeGlobalInteractorSnapshot(hContext);
-	success &= txRegisterConnectionStateChangedHandler(hContext, &hConnectionStateChangedTicket, OnEngineConnectionStateChanged, NULL) == TX_RESULT_OK;
-	success &= txRegisterEventHandler(hContext, &hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
-	// enables connection to EyeX Engine, connection alive
-	// until it is desabled or context is destroyed
-	success &= txEnableConnection(hContext) == TX_RESULT_OK;
+	success = _on_start(subscription_filter, &hContext, &hConnectionStateChangedTicket, &hEventHandlerTicket);
 
-	if (success) {
-		printf("Initialization was successful.\n");
-	} else {
-		printf("Initialization failed.\n");
+	if (!success) {
+		send_zmq_message(ET_INIT_FAILED);
+		_on_stop(&hContext);
 	}
-
-	// Create and initialize 0mq sockets
-	context = zmq_ctx_new();
-	subscription_socket = zmq_socket(context, ZMQ_SUB);
-	push_socket = zmq_socket(context,ZMQ_PUSH);
-	zmq_connect(subscription_socket, SOCKET_SUB);
-	zmq_connect(push_socket, SOCKET_PUSH);
-	zmq_setsockopt(subscription_socket, ZMQ_SUBSCRIBE, subscription_filter, strlen(subscription_filter));
 
 	while (is_alive == 1) {
-		zmq_recv(subscription_socket,buffer,100,ZMQ_DONTWAIT);
-		
-		if (strstr(buffer,"cmd=quit") != NULL) {
+		received = read_message();
+		if (received == CONSOLE_STOP) {
 			is_alive = 0;
-			quit_app(&hContext);
+			_on_stop(&hContext);
+		}
+		else if (received == CONSOLE_MARCO) {
+			_on_marco();
 		}
 	}
-
-	printf("quit successful\n");
-	while (1);
 
 	return 0;
 }

@@ -160,10 +160,14 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 {
 	char send_message[30]; // Max message size is 30 bytes
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
+	DWORD screen_width = GetSystemMetrics(SM_CXSCREEN);
+	DWORD screen_height = GetSystemMetrics(SM_CYSCREEN);
+	float scale_factor_x = 1920.0/screen_width;
+	float scale_factor_y = 1080.0/screen_height;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
 		connection_successful = 1;
 		last_data_sent_time = time(NULL);
-		_snprintf(send_message, 50, "%s gaze %d,%d",TOPIC_FILTER, (int)eventParams.X, (int)eventParams.Y);
+		_snprintf(send_message, 50, "%s gaze %d,%d",TOPIC_FILTER, (int)(eventParams.X/scale_factor_x), (int)(eventParams.Y/scale_factor_y));
 		if (start_message_sent == 1 && marco_blocking == 0)
 			zmq_send(push_socket, send_message, strlen(send_message), 0);
 	} else {

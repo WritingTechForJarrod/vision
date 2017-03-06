@@ -9,6 +9,7 @@
 #define SOCKET_SUB  "tcp://localhost:5556" // Eye tracker module listens to this socket for commands
 #define SOCKET_PUSH "tcp://localhost:5557" // Eye tracker module pushes updates on this socket
 #define TOPIC_FILTER "eyetracker"
+#define TIMEOUT_THRESHOLD 5 // Timeout before marco command does not reply with polo.
 
 #include <Windows.h>
 #include <stdio.h>
@@ -29,6 +30,8 @@ static void *subscription_socket;
 static void *push_socket;
 static int start_message_sent = 0;
 static int marco_blocking = 0;
+static int connection_successful = 0;
+static time_t last_data_sent_time;
 
 /*
 * Array of valid messages eyetracker can send. Maintains one to one correspondence with "message_type" enumeration.
@@ -132,10 +135,12 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 
 	case TX_CONNECTIONSTATE_DISCONNECTED:
 		//printf("The connection state is now DISCONNECTED (We are disconnected from the EyeX Engine)\n");
+		connection_successful = 0;
 		break;
 
 	case TX_CONNECTIONSTATE_TRYINGTOCONNECT:
 		//printf("The connection state is now TRYINGTOCONNECT (We are trying to connect to the EyeX Engine)\n");
+		connection_successful = 0;
 		break;
 
 	case TX_CONNECTIONSTATE_SERVERVERSIONTOOLOW:
@@ -156,6 +161,8 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 	char send_message[30]; // Max message size is 30 bytes
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
+		connection_successful = 1;
+		last_data_sent_time = time(NULL);
 		_snprintf(send_message, 50, "%s gaze %d,%d",TOPIC_FILTER, (int)eventParams.X, (int)eventParams.Y);
 		if (start_message_sent == 1 && marco_blocking == 0)
 			zmq_send(push_socket, send_message, strlen(send_message), 0);
@@ -224,8 +231,13 @@ BOOL _on_start(char* subscription_filter, TX_CONTEXTHANDLE* hContext, TX_TICKET*
 * After receiving "marco" command, responds with "eyetracker polo".
 */
 void _on_marco() {
+	time_t current_time = time(NULL);
 	marco_blocking = 1;
-	send_zmq_message(ET_MARCO);
+	if (connection_successful == 1 && (current_time - last_data_sent_time) < TIMEOUT_THRESHOLD) {
+		send_zmq_message(ET_MARCO);
+	}
+	else
+		connection_successful = 0;
 	marco_blocking = 0;
 	return;
 }

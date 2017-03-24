@@ -43,33 +43,60 @@
 #include <dlib/image_processing.h>
 #include <dlib/gui_widgets.h>
 #include <zmq.hpp>
+#include <cmath>
 
 using namespace dlib;
 
-// Averages points given to it and stores in given x and y references
-template <class T>
-void average(float& x, float& y, const dlib::full_object_detection& points, std::initializer_list<T> list) {
-	x = 0;
-	y = 0;
-	int n = 0;
-	for (auto elem : list) {
-		x += static_cast<float>(points.part(elem).x());
-		y += static_cast<float>(points.part(elem).y());
-		n++;
+struct vector2f {
+	float x;
+	float y;
+	vector2f operator+(const vector2f& other) {
+		float new_x = x + other.x;
+		float new_y = y + other.y;
+		return vector2f{ new_x, new_y };
 	}
-	x /= n;
-	y /= n;
+	vector2f operator/(const float& scalar) {
+		float new_x = x / scalar;
+		float new_y = y / scalar;
+		return vector2f{ new_x, new_y };
+	}
+};
+
+// Averages points given to it and stores in given x and y references
+void average(const dlib::full_object_detection& points, int start, int stop, vector2f& v) {
+	v.x = 0;
+	v.y = 0;
+	for (int n = start; n <= stop; n++) {
+		v.x += static_cast<float>(points.part(n).x());
+		v.y += static_cast<float>(points.part(n).y());
+	}
+	v.x /= stop - start + 1;
+	v.y /= stop - start + 1;
 }
 
+// Euclidean distance
+float distance(float x1, float y1, float x2, float y2) {
+	return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
 
-class ZmqConnector {
+float distance(vector2f v1, vector2f v2) {
+	return distance(v1.x, v1.y, v2.x, v2.y);
+}
+
+enum Mode {
+	RAW,
+	NORMALIZED
+};
+
+class Face {
 private:
 	zmq::socket_t sub;
 	zmq::socket_t push;
 	static zmq::context_t context;
+	Mode mode;
 
 public:
-	ZmqConnector() : sub(context, ZMQ_SUB), push(context, ZMQ_PUSH) {
+	Face() : sub(context, ZMQ_SUB), push(context, ZMQ_PUSH), mode(Mode::NORMALIZED) {
 		sub.connect("tcp://localhost:5556");
 		push.connect("tcp://localhost:5557");
 		const char *filter = "@face";
@@ -77,7 +104,7 @@ public:
 		send("face starting");
 	}
 
-	virtual ~ZmqConnector() {
+	virtual ~Face() {
 		sub.close();
 		push.close();
 	}
@@ -86,6 +113,10 @@ public:
 		zmq::message_t sending(strlen(buffer));
 		memcpy(sending.data(), buffer, strlen(buffer));
 		push.send(sending);
+	}
+
+	Mode get_mode() const {
+		return mode;
 	}
 
 	bool receive() {
@@ -100,9 +131,14 @@ public:
 					char* exit_message = "face stopping";
 					send(exit_message);
 					return false;
-				}
-				else if (strstr(message.c_str(), "marco")) {
+				} else if (strstr(message.c_str(), "marco")) {
 					send("face polo");
+				} else if (strstr(message.c_str(), "mode raw")) {
+					mode = Mode::RAW;
+					send("face ack raw");
+				} else if (strstr(message.c_str(), "mode normalized")) {
+					mode = Mode::NORMALIZED;
+					send("face ack normalized");
 				}
 			}
 		}
@@ -110,13 +146,12 @@ public:
 	}
 };
 
-zmq::context_t ZmqConnector::context = zmq::context_t(1);
-
+zmq::context_t Face::context = zmq::context_t(1);
 
 int main() {
     try {
 
-		ZmqConnector zmq_connector;
+		Face face;
 
         cv::VideoCapture cap(0);
         if (!cap.isOpened()) {
@@ -181,28 +216,74 @@ int main() {
 				// 48,60,54,64 : r-l corners (lower, upper?)
 				// 65,66,67 : lower lip
 
-				auto a = shapes[0];
-				// x and y for right brow, left brow, right eye, left eye, nose, upper mouth, lower mouth
-				float brx, bry, blx, bly, erx, ery, elx, ely, nx, ny, mux, muy, mlx, mly, jawx, jawy;
-				average(brx, bry, shapes[0], { 17, 18, 19, 20, 21 });
-				average(blx, bly, shapes[0], { 22, 23, 24, 25, 26 });
-				average(erx, ery, shapes[0], { 36, 37, 38, 39, 40, 41 });
-				average(elx, ely, shapes[0], { 42, 43, 44, 45, 46, 47 });
-				average(nx, ny, shapes[0], { 27, 28, 29, 30, 31, 32, 33, 34, 35 });
-				average(mux, muy, shapes[0], { 48, 49, 50, 51, 52, 53, 54 });
-				average(mlx, mly, shapes[0], { 54, 55, 56, 57, 58, 59, 60 });
-				average(jawx, jawy, shapes[0], { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 });
+				auto& detected_face = shapes[0];
+
+				vector2f brows[2];
+				vector2f eyes[2];
+				vector2f nose;
+				vector2f jaw;
+				vector2f upper_mouth;
+				vector2f lower_mouth;
+				vector2f face_center;
+
+				average(detected_face, 17, 21, brows[0]);
+				average(detected_face, 22, 26, brows[1]);
+				average(detected_face, 36, 41, eyes[0]);
+				average(detected_face, 42, 47, eyes[1]);
+				average(detected_face, 27, 35, nose);
+				average(detected_face, 1, 16, jaw);
+				average(detected_face, 48, 54, upper_mouth);
+				average(detected_face, 54, 60, lower_mouth);
+				average(detected_face, 1, 68, face_center);
 
 				// Create the tranmission buffer and load it with a string in the form of:
 				// face position [comma seperated face point values]
 				char buffer[512];
-				sprintf(buffer,
-					"face position %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f",
-					brx, bry, blx, bly, erx, ery, elx, ely, nx, ny, mux, muy, mlx, mly, jawx, jawy
-				);
+				if (face.get_mode() == Mode::RAW) {
+					sprintf(buffer,
+						"face position %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f",
+						brows[0].x, brows[0].y, brows[1].x, brows[1].y,
+						eyes[0].x, eyes[0].y, eyes[1].x, eyes[1].y,
+						nose.x, nose.y,
+						jaw.x, jaw.y,
+						upper_mouth.x, upper_mouth.y, lower_mouth.x, lower_mouth.y
+					);
+				} else if (face.get_mode() == Mode::NORMALIZED) {
+					float face_vector[6]; 
+					// All important face points calculated relative to center
+					// In order, average brow distance, average eye distance, nose distance, jaw distance
+					//	upper mouth distance, lower mouth distance
+
+					vector2f avg_brow = (brows[0] + brows[1]) / 2;
+					vector2f avg_eye = (eyes[0] + eyes[1]) / 2;
+					face_vector[0] = distance(avg_brow, face_center);
+					face_vector[1] = distance(avg_eye, face_center);
+					face_vector[2] = distance(nose, face_center);
+					face_vector[3] = distance(jaw, face_center);
+					face_vector[4] = distance(upper_mouth, face_center);
+					face_vector[5] = distance(lower_mouth, face_center);
+					
+					// Find length of face vector
+					float length(0);
+					for (float f : face_vector) {
+						length += (f * f);
+					}
+					length = sqrt(length);
+					
+					// Normalize face vector
+					for (float& f : face_vector) {
+						f = f / length;
+					}
+
+					auto& fv = face_vector;
+					sprintf(buffer,
+						"face vector %f,%f,%f,%f,%f,%f",
+						fv[0], fv[1], fv[2], fv[3], fv[4], fv[5]
+					);
+				}
 				
-				zmq_connector.send(buffer);
-				alive = zmq_connector.receive();
+				face.send(buffer);
+				alive = face.receive();
 			}
 		}
     } catch(std::exception& e) {
